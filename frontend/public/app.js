@@ -1,4 +1,6 @@
-let viewer;
+let map;
+let routeLayer = null;
+let markersLayer = null;
 let vehiculosCache = {};
 
 // Coordenadas pre-resueltas cuando el usuario elige una sugerencia
@@ -13,6 +15,8 @@ const routeState = {
   toll_distance_km: 0
 };
 
+// ─── Utilidades ───────────────────────────────────────────────────────────────
+
 function debounce(fn, delay) {
   let timer;
   return function (...args) {
@@ -20,6 +24,15 @@ function debounce(fn, delay) {
     timer = setTimeout(() => fn.apply(this, args), delay);
   };
 }
+
+function formatDuracion(minutos) {
+  if (minutos < 60) return `${minutos} min`;
+  const h = Math.floor(minutos / 60);
+  const m = minutos % 60;
+  return m > 0 ? `${h}h ${m}min` : `${h}h`;
+}
+
+// ─── Autocompletado ───────────────────────────────────────────────────────────
 
 async function fetchSuggestions(query) {
   const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=0`;
@@ -91,33 +104,53 @@ function setupAutocomplete(field) {
   input.addEventListener('blur', () => setTimeout(closeList, 150));
 }
 
-function initCesium() {
-  try {
-    Cesium.Ion.defaultAccessToken = '';
+// ─── Mapa (Leaflet) ───────────────────────────────────────────────────────────
 
-    viewer = new Cesium.Viewer('cesiumContainer', {
-      imageryProvider: new Cesium.OpenStreetMapImageryProvider({
-        url: 'https://a.tile.openstreetmap.org/'
-      }),
-      terrainProvider: new Cesium.EllipsoidTerrainProvider(),
-      baseLayerPicker: false,
-      sceneModePicker: false,
-      animation: false,
-      timeline: false,
-      fullscreenButton: false,
-      navigationHelpButton: false,
-      geocoder: false,
-      homeButton: false,
-      scene3DOnly: true
-    });
-  } catch (e) {
-    console.error('Error al inicializar Cesium:', e);
-  }
+function initMap() {
+  map = L.map('mapContainer').setView([40.4168, -3.7038], 6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(map);
 
   setupAutocomplete('origen');
   setupAutocomplete('destino');
   cargarVehiculos();
 }
+
+function dibujarRutaEnMapa(geometry, origenCoords, destinoCoords) {
+  if (!map) return;
+
+  if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+  if (markersLayer) { map.removeLayer(markersLayer); markersLayer = null; }
+
+  const latlngs = geometry.coordinates.map(c => [c[1], c[0]]);
+  routeLayer = L.polyline(latlngs, { color: '#2980b9', weight: 5, opacity: 0.85 }).addTo(map);
+
+  markersLayer = L.layerGroup().addTo(map);
+
+  const dotStyle = (color) => `
+    width:16px;height:16px;border-radius:50%;
+    background:${color};border:3px solid white;
+    box-shadow:0 1px 5px rgba(0,0,0,0.4);`;
+
+  const iconOrigen = L.divIcon({
+    html: `<div style="${dotStyle('#27ae60')}"></div>`,
+    iconSize: [16, 16], iconAnchor: [8, 8], className: ''
+  });
+  const iconDestino = L.divIcon({
+    html: `<div style="${dotStyle('#e74c3c')}"></div>`,
+    iconSize: [16, 16], iconAnchor: [8, 8], className: ''
+  });
+
+  L.marker([origenCoords.lat, origenCoords.lon], { icon: iconOrigen })
+    .bindPopup('<b>Origen</b>').addTo(markersLayer);
+  L.marker([destinoCoords.lat, destinoCoords.lon], { icon: iconDestino })
+    .bindPopup('<b>Destino</b>').addTo(markersLayer);
+
+  map.fitBounds(routeLayer.getBounds(), { padding: [40, 40] });
+}
+
+// ─── Vehículos ────────────────────────────────────────────────────────────────
 
 async function cargarVehiculos() {
   try {
@@ -129,11 +162,10 @@ async function cargarVehiculos() {
 
     const select = document.getElementById('vehiculo');
     select.innerHTML = '<option value="">Seleccionar vehículo</option>';
-
     vehiculos.forEach(v => {
       const option = document.createElement('option');
       option.value = v.id;
-      option.textContent = `${v.nombre} (${v.tipo})`;
+      option.textContent = `${v.nombre} (${v.tipo}) — ${v.consumo_combustible} L/100km`;
       select.appendChild(option);
     });
   } catch (error) {
@@ -141,100 +173,57 @@ async function cargarVehiculos() {
   }
 }
 
+function onVehiculoChange() {
+  // Si ya hay una ruta calculada, recalcular combustible con el nuevo vehículo
+  if (routeState.distancia_km) {
+    recalcularCombustible();
+  }
+}
+
+function recalcularCombustible() {
+  const vehiculoId = document.getElementById('vehiculo').value;
+  const vehiculo = vehiculosCache[vehiculoId] || null;
+  const precioCombustible = parseFloat(document.getElementById('precioCombustible').value) || 1.50;
+
+  if (vehiculo && vehiculo.consumo_combustible && routeState.distancia_km) {
+    const litros = (routeState.distancia_km / 100) * parseFloat(vehiculo.consumo_combustible);
+    const costo = litros * precioCombustible;
+    document.getElementById('combustible').value = costo.toFixed(2);
+    document.getElementById('infoCombustible').textContent =
+      `€${costo.toFixed(2)} (${litros.toFixed(1)} L × €${precioCombustible.toFixed(2)}/L)`;
+  }
+}
+
+// ─── Geocodificación ──────────────────────────────────────────────────────────
+
 async function geocodeAddress(address) {
   const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
   const response = await fetch(url, {
-    headers: {
-      'Accept-Language': 'es',
-      'User-Agent': 'EmpresaRutaPlanner/1.0'
-    }
+    headers: { 'Accept-Language': 'es', 'User-Agent': 'EmpresaRutaPlanner/1.0' }
   });
   const data = await response.json();
-  if (!data.length) {
-    throw new Error(`No se encontró la dirección: "${address}"`);
-  }
+  if (!data.length) throw new Error(`No se encontró: "${address}"`);
   return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
 }
 
+// ─── Perfil ORS y peajes ──────────────────────────────────────────────────────
+
 function getORSProfile(vehiculo) {
   if (!vehiculo) return 'driving-car';
-  if (vehiculo.tiene_tacografo) return 'driving-hgv';
-  return 'driving-car';
+  return vehiculo.tiene_tacografo ? 'driving-hgv' : 'driving-car';
 }
 
 function estimarCostoPeajes(toll_km, vehiculo) {
   if (!vehiculo || toll_km <= 0) return 0;
-
   const tipo = (vehiculo.tipo || '').toLowerCase();
   let tarifa = 0.08;
-
-  if (tipo.includes('camión') || tipo.includes('camion')) {
-    tarifa = 0.15;
-  } else if (tipo.includes('furg')) {
-    tarifa = 0.10;
-  } else if (tipo.includes('camioneta')) {
-    tarifa = 0.08;
-  }
-
+  if (tipo.includes('camión') || tipo.includes('camion')) tarifa = 0.15;
+  else if (tipo.includes('furg')) tarifa = 0.10;
+  else if (tipo.includes('camioneta')) tarifa = 0.08;
   return toll_km * tarifa;
 }
 
-function dibujarRutaEnMapa(geometry, origenCoords, destinoCoords) {
-  if (!viewer) return;
-  viewer.entities.removeAll();
-
-  const positions = geometry.coordinates.map(c =>
-    Cesium.Cartesian3.fromDegrees(c[0], c[1])
-  );
-
-  viewer.entities.add({
-    polyline: {
-      positions,
-      width: 4,
-      material: new Cesium.PolylineArrowMaterialProperty(Cesium.Color.BLUE)
-    }
-  });
-
-  viewer.entities.add({
-    position: Cesium.Cartesian3.fromDegrees(origenCoords.lon, origenCoords.lat),
-    point: {
-      pixelSize: 12,
-      color: Cesium.Color.GREEN,
-      outlineColor: Cesium.Color.WHITE,
-      outlineWidth: 2
-    },
-    label: {
-      text: 'Origen',
-      font: '12pt Arial',
-      fillColor: Cesium.Color.WHITE,
-      outlineColor: Cesium.Color.BLACK,
-      outlineWidth: 2,
-      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-      pixelOffset: new Cesium.Cartesian2(0, -15)
-    }
-  });
-
-  viewer.entities.add({
-    position: Cesium.Cartesian3.fromDegrees(destinoCoords.lon, destinoCoords.lat),
-    point: {
-      pixelSize: 12,
-      color: Cesium.Color.RED,
-      outlineColor: Cesium.Color.WHITE,
-      outlineWidth: 2
-    },
-    label: {
-      text: 'Destino',
-      font: '12pt Arial',
-      fillColor: Cesium.Color.WHITE,
-      outlineColor: Cesium.Color.BLACK,
-      outlineWidth: 2,
-      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-      pixelOffset: new Cesium.Cartesian2(0, -15)
-    }
-  });
-
-  viewer.zoomTo(viewer.entities);
-}
+// ─── Calcular ruta ────────────────────────────────────────────────────────────
 
 async function calcularRuta() {
   const origenInput = document.getElementById('origen').value.trim();
@@ -262,7 +251,7 @@ async function calcularRuta() {
     const vehiculo = vehiculosCache[vehiculoId] || null;
     const profile = getORSProfile(vehiculo);
 
-    statusEl.textContent = 'Calculando ruta...';
+    statusEl.textContent = 'Calculando ruta con OpenRouteService...';
 
     const response = await fetch('/api/rutas/route', {
       method: 'POST',
@@ -281,6 +270,7 @@ async function calcularRuta() {
 
     const routeData = await response.json();
 
+    // Guardar estado global de la ruta
     routeState.origenCoords = origenCoords;
     routeState.destinoCoords = destinoCoords;
     routeState.distancia_km = routeData.distance_m / 1000;
@@ -288,18 +278,36 @@ async function calcularRuta() {
     routeState.geometry = routeData.geometry;
     routeState.toll_distance_km = routeData.toll_distance_m / 1000;
 
+    // Calcular costes
+    const precioCombustible = parseFloat(document.getElementById('precioCombustible').value) || 1.50;
     const costoPeajes = estimarCostoPeajes(routeState.toll_distance_km, vehiculo);
 
+    let litros = 0;
+    let costoCombustible = 0;
+    if (vehiculo && vehiculo.consumo_combustible) {
+      litros = (routeState.distancia_km / 100) * parseFloat(vehiculo.consumo_combustible);
+      costoCombustible = litros * precioCombustible;
+    }
+
+    // Dibujar en mapa
     dibujarRutaEnMapa(routeData.geometry, origenCoords, destinoCoords);
 
+    // Actualizar panel de info
     document.getElementById('infoDistancia').textContent = `${routeState.distancia_km.toFixed(1)} km`;
-    document.getElementById('infoDuracion').textContent = `${routeState.duracion_min} min`;
-    document.getElementById('infoPeajes').textContent = `€${costoPeajes.toFixed(2)}`;
+    document.getElementById('infoDuracion').textContent = formatDuracion(routeState.duracion_min);
+    document.getElementById('infoCombustible').textContent = vehiculo
+      ? `€${costoCombustible.toFixed(2)} (${litros.toFixed(1)} L × €${precioCombustible.toFixed(2)}/L)`
+      : 'Selecciona un vehículo';
+    document.getElementById('infoKmPeaje').textContent = `${routeState.toll_distance_km.toFixed(1)} km`;
+    document.getElementById('infoPeajes').textContent =
+      routeState.toll_distance_km > 0 ? `€${costoPeajes.toFixed(2)}` : 'Sin peajes';
     document.getElementById('routeInfo').style.display = 'block';
 
+    // Rellenar inputs de costes
+    if (vehiculo) document.getElementById('combustible').value = costoCombustible.toFixed(2);
     document.getElementById('peajes').value = costoPeajes.toFixed(2);
 
-    statusEl.textContent = 'Ruta calculada correctamente';
+    statusEl.textContent = `Ruta calculada: ${routeState.distancia_km.toFixed(1)} km · ${formatDuracion(routeState.duracion_min)}`;
     statusEl.className = 'route-status success';
   } catch (error) {
     statusEl.textContent = `Error: ${error.message}`;
@@ -308,6 +316,8 @@ async function calcularRuta() {
     btnCalc.disabled = false;
   }
 }
+
+// ─── Guardar ruta ─────────────────────────────────────────────────────────────
 
 async function guardarRuta() {
   const nombre = document.getElementById('nombreRuta').value.trim();
@@ -318,15 +328,8 @@ async function guardarRuta() {
   const mantenimiento = document.getElementById('mantenimiento').value;
   const margen = document.getElementById('margen').value;
 
-  if (!nombre) {
-    alert('Por favor, introduce el nombre de la ruta');
-    return;
-  }
-
-  if (!routeState.distancia_km) {
-    alert('Por favor, calcula la ruta antes de guardarla');
-    return;
-  }
+  if (!nombre) { alert('Por favor, introduce el nombre de la ruta'); return; }
+  if (!routeState.distancia_km) { alert('Por favor, calcula la ruta antes de guardarla'); return; }
 
   const puntos_ruta = routeState.geometry
     ? routeState.geometry.coordinates.map(c => ({ lon: c[0], lat: c[1] }))
@@ -355,9 +358,7 @@ async function guardarRuta() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(rutaData)
     });
-
     const result = await response.json();
-
     if (response.ok) {
       mostrarResultados(result);
     } else {
@@ -374,11 +375,10 @@ function mostrarResultados(ruta) {
   document.getElementById('pvpRecomendado').textContent = `€${parseFloat(ruta.pvp_recomendado).toFixed(2)}`;
 
   const descansoInfo = document.getElementById('descansoInfo');
-  const descansoTexto = document.getElementById('descansoTexto');
-
   if (ruta.tiempo_descanso_total > 0) {
     descansoInfo.style.display = 'block';
-    descansoTexto.textContent = `Tiempo de descanso adicional: ${ruta.tiempo_descanso_total} minutos`;
+    document.getElementById('descansoTexto').textContent =
+      `Tiempo de descanso adicional: ${ruta.tiempo_descanso_total} minutos`;
   } else {
     descansoInfo.style.display = 'none';
   }
@@ -386,6 +386,9 @@ function mostrarResultados(ruta) {
   document.getElementById('resultados').style.display = 'block';
 }
 
-window.addEventListener('load', initCesium);
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
+window.addEventListener('load', initMap);
 window.calcularRuta = calcularRuta;
 window.guardarRuta = guardarRuta;
+window.onVehiculoChange = onVehiculoChange;

@@ -47,15 +47,22 @@ const calcularRuta = async (req, res) => {
 
     let toll_distance_m = 0;
     const extras = feature.properties.extras;
-    if (extras && extras.tollways && extras.tollways.values) {
-      const coords = geometry.coordinates;
-      extras.tollways.values.forEach(([start, end, value]) => {
-        if (value === 1) {
-          for (let i = start; i < end && i + 1 < coords.length; i++) {
-            toll_distance_m += haversine(coords[i], coords[i + 1]);
+    if (extras && extras.tollways) {
+      if (extras.tollways.summary) {
+        // ORS ya calcula la distancia por tipo de tramo
+        const tollEntry = extras.tollways.summary.find(s => s.value === 1);
+        if (tollEntry) toll_distance_m = tollEntry.distance;
+      } else if (extras.tollways.values) {
+        // Fallback: Haversine sobre segmentos marcados como peaje
+        const coords = geometry.coordinates;
+        extras.tollways.values.forEach(([start, end, value]) => {
+          if (value === 1) {
+            for (let i = start; i < end && i + 1 < coords.length; i++) {
+              toll_distance_m += haversine(coords[i], coords[i + 1]);
+            }
           }
-        }
-      });
+        });
+      }
     }
 
     res.json({ distance_m, duration_s, geometry, toll_distance_m });

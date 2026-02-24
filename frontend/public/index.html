@@ -4,21 +4,21 @@
     <title>Planificador de Rutas Empresarial</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cesium.com/downloads/cesiumjs/releases/Cesium-1.90/Build/Cesium/Cesium.js"></script>
-    <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/Cesium-1.90/Build/Cesium/Widgets/widgets.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body { font-family: 'Arial', sans-serif; background-color: #f5f5f5; }
 
-        #cesiumContainer { width: 100%; height: 100vh; }
+        #mapContainer { width: 100%; height: 100vh; }
 
         .sidebar {
             position: absolute;
             top: 20px;
             left: 20px;
             width: 350px;
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.97);
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.15);
@@ -50,6 +50,20 @@
             border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 14px;
+        }
+
+        .input-with-unit {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .input-with-unit input { flex: 1; }
+
+        .input-with-unit span {
+            font-size: 13px;
+            color: #7f8c8d;
+            white-space: nowrap;
         }
 
         .btn {
@@ -112,10 +126,14 @@
             border-left: 4px solid #3498db;
             padding: 12px;
             margin-top: 10px;
-            font-size: 14px;
+            font-size: 13px;
         }
 
-        .route-info p { margin: 4px 0; }
+        .route-info p { margin: 5px 0; }
+
+        .route-info .label { color: #7f8c8d; }
+
+        .route-info .value { font-weight: bold; color: #2c3e50; }
 
         .section-divider {
             border: none;
@@ -147,9 +165,7 @@
             font-size: 12px;
         }
 
-        .autocomplete-wrapper {
-            position: relative;
-        }
+        .autocomplete-wrapper { position: relative; }
 
         .suggestions {
             position: absolute;
@@ -178,23 +194,17 @@
         }
 
         .suggestions li:last-child { border-bottom: none; }
-
-        .suggestions li:hover {
+        .suggestions li:hover, .suggestions li.active {
             background-color: #eaf4fb;
             color: #2980b9;
-        }
-
-        .suggestions li.active {
-            background-color: #d6eaf8;
-            color: #1a5276;
         }
     </style>
 </head>
 <body>
-    <div id="cesiumContainer"></div>
+    <div id="mapContainer"></div>
 
     <div class="sidebar">
-        <h2>Planificador de Rutas Empresarial</h2>
+        <h2>Planificador de Rutas</h2>
 
         <div class="form-group">
             <label for="nombreRuta">Nombre de la Ruta:</label>
@@ -219,18 +229,28 @@
 
         <div class="form-group">
             <label for="vehiculo">Vehículo:</label>
-            <select id="vehiculo">
+            <select id="vehiculo" onchange="onVehiculoChange()">
                 <option value="">Seleccionar vehículo</option>
             </select>
+        </div>
+
+        <div class="form-group">
+            <label for="precioCombustible">Precio combustible:</label>
+            <div class="input-with-unit">
+                <input type="number" id="precioCombustible" value="1.50" step="0.01" min="0">
+                <span>€/litro</span>
+            </div>
         </div>
 
         <button class="btn" id="btnCalcular" onclick="calcularRuta()">Calcular Ruta</button>
         <div id="routeStatus" class="route-status"></div>
 
         <div id="routeInfo" class="route-info" style="display: none;">
-            <p><strong>Distancia:</strong> <span id="infoDistancia">-</span></p>
-            <p><strong>Duración:</strong> <span id="infoDuracion">-</span></p>
-            <p><strong>Peajes estimados:</strong> <span id="infoPeajes">-</span></p>
+            <p><span class="label">Distancia:</span> <span class="value" id="infoDistancia">-</span></p>
+            <p><span class="label">Duración:</span> <span class="value" id="infoDuracion">-</span></p>
+            <p><span class="label">Combustible:</span> <span class="value" id="infoCombustible">-</span></p>
+            <p><span class="label">Tramos de peaje:</span> <span class="value" id="infoKmPeaje">-</span></p>
+            <p><span class="label">Coste peajes:</span> <span class="value" id="infoPeajes">-</span></p>
         </div>
 
         <hr class="section-divider">
