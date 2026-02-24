@@ -1,0 +1,27 @@
+{
+  "name": "empresa-ruta-planner",
+  "version": "1.0.0",
+  "description": "Webapp Planner",
+  "main": "backend/app.js",
+  "scripts": {
+    "start": "node backend/app.js",
+    "dev": "nodemon backend/app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.0",
+    "sequelize": "^6.21.0",
+    "pg": "^8.7.0",
+    "cesium": "^1.90.0",
+    "axios": "^1.0.0",
+    "body-parser": "^1.20.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.20"
+  },
+  "keywords": ["route-planner", "cesium", "business", "logistics"],
+  "author": "Tu Empresa",
+  "license": "MIT"
+}

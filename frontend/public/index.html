@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Planificador de Rutas Empresarial</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cesium.com/downloads/cesiumjs/releases/Cesium-1.90/Build/Cesium/Cesium.js"></script>
+    <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/Cesium-1.90/Build/Cesium/Widgets/widgets.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body { font-family: 'Arial', sans-serif; background-color: #f5f5f5; }
+
+        #cesiumContainer { width: 100%; height: 100vh; }
+
+        .sidebar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 350px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            z-index: 1000;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .sidebar h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .form-group { margin-bottom: 15px; }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #34495e;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .btn {
+            background-color: #3498db;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn:hover { background-color: #2980b9; }
+
+        .resultados {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e8f4fc;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+
+        .resultados h3 { margin-bottom: 10px; color: #2c3e50; }
+
+        .resultados p { margin: 5px 0; font-size: 14px; }
+
+        .costo-total { font-weight: bold; color: #e74c3c; }
+
+        .pvp-recomendado { font-weight: bold; color: #27ae60; }
+
+        .descanso-info {
+            background-color: #fff8e1;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="cesiumContainer"></div>
+
+    <div class="sidebar">
+        <h2>Planificador de Rutas Empresarial</h2>
+
+        <div class="form-group">
+            <label for="nombreRuta">Nombre de la Ruta:</label>
+            <input type="text" id="nombreRuta" placeholder="Ej: Ruta a Clientes">
+        </div>
+
+        <div class="form-group">
+            <label for="distancia">Distancia (km):</label>
+            <input type="number" id="distancia" placeholder="0" step="0.1">
+        </div>
+
+        <div class="form-group">
+            <label for="duracion">Duración Estimada (min):</label>
+            <input type="number" id="duracion" placeholder="0">
+        </div>
+
+        <div class="form-group">
+            <label for="vehiculo">Vehículo:</label>
+            <select id="vehiculo">
+                <option value="">Seleccionar vehículo</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="combustible">Costo Combustible (€):</label>
+            <input type="number" id="combustible" placeholder="0" step="0.01">
+        </div>
+
+        <div class="form-group">
+            <label for="peajes">Costo Peajes (€):</label>
+            <input type="number" id="peajes" placeholder="0" step="0.01">
+        </div>
+
+        <div class="form-group">
+            <label for="personal">Costo Personal (€):</label>
+            <input type="number" id="personal" placeholder="0" step="0.01">
+        </div>
+
+        <div class="form-group">
+            <label for="mantenimiento">Costo Mantenimiento (€):</label>
+            <input type="number" id="mantenimiento" placeholder="0" step="0.01">
+        </div>
+
+        <div class="form-group">
+            <label for="margen">Margen de Ganancia (%):</label>
+            <input type="number" id="margen" placeholder="20" step="0.1" value="20">
+        </div>
+
+        <button class="btn" onclick="crearRuta()">Crear Ruta</button>
+
+        <div id="resultados" class="resultados" style="display: none;">
+            <h3>Resultados</h3>
+            <p><span class="costo-total">Costo Total:</span> <span id="costoTotal">€0.00</span></p>
+            <p><span class="pvp-recomendado">PVP Recomendado:</span> <span id="pvpRecomendado">€0.00</span></p>
+            <div id="descansoInfo" class="descanso-info" style="display: none;">
+                <strong>Información de Descanso (Tacógrafo):</strong>
+                <p id="descansoTexto">-</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
