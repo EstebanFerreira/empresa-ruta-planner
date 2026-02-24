@@ -66,6 +66,63 @@
 
         .btn:hover { background-color: #2980b9; }
 
+        .btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background-color: #27ae60;
+        }
+
+        .btn-secondary:hover { background-color: #219a52; }
+
+        .route-status {
+            margin-top: 8px;
+            padding: 8px 10px;
+            border-radius: 5px;
+            font-size: 13px;
+            display: none;
+        }
+
+        .route-status.loading {
+            display: block;
+            background-color: #eaf4fb;
+            color: #2980b9;
+            border-left: 3px solid #3498db;
+        }
+
+        .route-status.success {
+            display: block;
+            background-color: #eafaf1;
+            color: #1e8449;
+            border-left: 3px solid #27ae60;
+        }
+
+        .route-status.error {
+            display: block;
+            background-color: #fdedec;
+            color: #c0392b;
+            border-left: 3px solid #e74c3c;
+        }
+
+        .route-info {
+            background-color: #eaf4fb;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+            padding: 12px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .route-info p { margin: 4px 0; }
+
+        .section-divider {
+            border: none;
+            border-top: 1px solid #ddd;
+            margin: 15px 0;
+        }
+
         .resultados {
             margin-top: 20px;
             padding: 15px;
@@ -103,13 +160,13 @@
         </div>
 
         <div class="form-group">
-            <label for="distancia">Distancia (km):</label>
-            <input type="number" id="distancia" placeholder="0" step="0.1">
+            <label for="origen">Dirección de Origen:</label>
+            <input type="text" id="origen" placeholder="Ej: Gran Vía 1, Madrid">
         </div>
 
         <div class="form-group">
-            <label for="duracion">Duración Estimada (min):</label>
-            <input type="number" id="duracion" placeholder="0">
+            <label for="destino">Dirección de Destino:</label>
+            <input type="text" id="destino" placeholder="Ej: Passeig de Gràcia 50, Barcelona">
         </div>
 
         <div class="form-group">
@@ -118,6 +175,17 @@
                 <option value="">Seleccionar vehículo</option>
             </select>
         </div>
+
+        <button class="btn" id="btnCalcular" onclick="calcularRuta()">Calcular Ruta</button>
+        <div id="routeStatus" class="route-status"></div>
+
+        <div id="routeInfo" class="route-info" style="display: none;">
+            <p><strong>Distancia:</strong> <span id="infoDistancia">-</span></p>
+            <p><strong>Duración:</strong> <span id="infoDuracion">-</span></p>
+            <p><strong>Peajes estimados:</strong> <span id="infoPeajes">-</span></p>
+        </div>
+
+        <hr class="section-divider">
 
         <div class="form-group">
             <label for="combustible">Costo Combustible (€):</label>
@@ -144,7 +212,7 @@
             <input type="number" id="margen" placeholder="20" step="0.1" value="20">
         </div>
 
-        <button class="btn" onclick="crearRuta()">Crear Ruta</button>
+        <button class="btn btn-secondary" onclick="guardarRuta()">Crear Ruta</button>
 
         <div id="resultados" class="resultados" style="display: none;">
             <h3>Resultados</h3>

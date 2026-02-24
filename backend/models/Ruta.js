@@ -63,6 +63,22 @@ const Ruta = sequelize.define('Ruta', {
     type: DataTypes.INTEGER,
     defaultValue: 0
   },
+  origen: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  destino: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  origen_coords: {
+    type: DataTypes.JSONB,
+    allowNull: true
+  },
+  destino_coords: {
+    type: DataTypes.JSONB,
+    allowNull: true
+  },
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW

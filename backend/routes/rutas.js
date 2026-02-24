@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const {
+  calcularRuta,
   crearRuta,
   obtenerRutas,
   obtenerRutaPorId,
@@ -8,6 +9,7 @@ const {
   eliminarRuta
 } = require('../controllers/rutaController');
 
+router.post('/route', calcularRuta);
 router.post('/', crearRuta);
 router.get('/', obtenerRutas);
 router.get('/:id', obtenerRutaPorId);
