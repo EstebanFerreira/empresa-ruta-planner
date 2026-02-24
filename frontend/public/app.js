@@ -11,16 +11,27 @@ const routeState = {
 };
 
 function initCesium() {
-  viewer = new Cesium.Viewer('cesiumContainer', {
-    imageryProvider: Cesium.createOpenStreetMapImageryProvider({
-      url: 'https://a.tile.openstreetmap.org/'
-    }),
-    sceneMode: Cesium.SceneMode.SCENE3D,
-    navigationHelpButton: false,
-    geocoder: false,
-    homeButton: false,
-    scene3DOnly: true
-  });
+  try {
+    Cesium.Ion.defaultAccessToken = '';
+
+    viewer = new Cesium.Viewer('cesiumContainer', {
+      imageryProvider: new Cesium.OpenStreetMapImageryProvider({
+        url: 'https://a.tile.openstreetmap.org/'
+      }),
+      terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+      baseLayerPicker: false,
+      sceneModePicker: false,
+      animation: false,
+      timeline: false,
+      fullscreenButton: false,
+      navigationHelpButton: false,
+      geocoder: false,
+      homeButton: false,
+      scene3DOnly: true
+    });
+  } catch (e) {
+    console.error('Error al inicializar Cesium:', e);
+  }
 
   cargarVehiculos();
 }
@@ -86,6 +97,7 @@ function estimarCostoPeajes(toll_km, vehiculo) {
 }
 
 function dibujarRutaEnMapa(geometry, origenCoords, destinoCoords) {
+  if (!viewer) return;
   viewer.entities.removeAll();
 
   const positions = geometry.coordinates.map(c =>
