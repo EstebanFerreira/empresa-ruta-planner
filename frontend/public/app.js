@@ -1,6 +1,9 @@
 let viewer;
 let vehiculosCache = {};
 
+// Coordenadas pre-resueltas cuando el usuario elige una sugerencia
+const resolvedCoords = { origen: null, destino: null };
+
 const routeState = {
   origenCoords: null,
   destinoCoords: null,
@@ -9,6 +12,84 @@ const routeState = {
   geometry: null,
   toll_distance_km: 0
 };
+
+function debounce(fn, delay) {
+  let timer;
+  return function (...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), delay);
+  };
+}
+
+async function fetchSuggestions(query) {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=0`;
+  const res = await fetch(url, {
+    headers: { 'Accept-Language': 'es', 'User-Agent': 'EmpresaRutaPlanner/1.0' }
+  });
+  return res.json();
+}
+
+function setupAutocomplete(field) {
+  const input = document.getElementById(field);
+  const list = document.getElementById(`${field}Suggestions`);
+  let activeIndex = -1;
+
+  function closeList() {
+    list.style.display = 'none';
+    activeIndex = -1;
+  }
+
+  function setActive(items) {
+    items.forEach((li, i) => li.classList.toggle('active', i === activeIndex));
+  }
+
+  const search = debounce(async (value) => {
+    if (value.length < 3) { closeList(); return; }
+    try {
+      const results = await fetchSuggestions(value);
+      list.innerHTML = '';
+      activeIndex = -1;
+      if (!results.length) { closeList(); return; }
+      results.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = item.display_name;
+        li.addEventListener('mousedown', () => {
+          input.value = item.display_name;
+          resolvedCoords[field] = { lat: parseFloat(item.lat), lon: parseFloat(item.lon) };
+          closeList();
+        });
+        list.appendChild(li);
+      });
+      list.style.display = 'block';
+    } catch (_) { closeList(); }
+  }, 350);
+
+  input.addEventListener('input', e => {
+    resolvedCoords[field] = null;
+    search(e.target.value);
+  });
+
+  input.addEventListener('keydown', e => {
+    const items = list.querySelectorAll('li');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      activeIndex = Math.min(activeIndex + 1, items.length - 1);
+      setActive(items);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      activeIndex = Math.max(activeIndex - 1, -1);
+      setActive(items);
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault();
+      items[activeIndex].dispatchEvent(new Event('mousedown'));
+    } else if (e.key === 'Escape') {
+      closeList();
+    }
+  });
+
+  input.addEventListener('blur', () => setTimeout(closeList, 150));
+}
 
 function initCesium() {
   try {
@@ -33,6 +114,8 @@ function initCesium() {
     console.error('Error al inicializar Cesium:', e);
   }
 
+  setupAutocomplete('origen');
+  setupAutocomplete('destino');
   cargarVehiculos();
 }
 
@@ -172,8 +255,8 @@ async function calcularRuta() {
 
   try {
     const [origenCoords, destinoCoords] = await Promise.all([
-      geocodeAddress(origenInput),
-      geocodeAddress(destinoInput)
+      resolvedCoords.origen  ? Promise.resolve(resolvedCoords.origen)  : geocodeAddress(origenInput),
+      resolvedCoords.destino ? Promise.resolve(resolvedCoords.destino) : geocodeAddress(destinoInput)
     ]);
 
     const vehiculo = vehiculosCache[vehiculoId] || null;

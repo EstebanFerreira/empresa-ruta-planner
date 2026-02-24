@@ -146,6 +146,48 @@
             margin-top: 10px;
             font-size: 12px;
         }
+
+        .autocomplete-wrapper {
+            position: relative;
+        }
+
+        .suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #bbb;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            list-style: none;
+            z-index: 1100;
+            display: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+        }
+
+        .suggestions li {
+            padding: 9px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #333;
+            border-bottom: 1px solid #f0f0f0;
+            line-height: 1.3;
+        }
+
+        .suggestions li:last-child { border-bottom: none; }
+
+        .suggestions li:hover {
+            background-color: #eaf4fb;
+            color: #2980b9;
+        }
+
+        .suggestions li.active {
+            background-color: #d6eaf8;
+            color: #1a5276;
+        }
     </style>
 </head>
 <body>
@@ -161,12 +203,18 @@
 
         <div class="form-group">
             <label for="origen">Dirección de Origen:</label>
-            <input type="text" id="origen" placeholder="Ej: Gran Vía 1, Madrid">
+            <div class="autocomplete-wrapper">
+                <input type="text" id="origen" placeholder="Ej: Gran Vía 1, Madrid" autocomplete="off">
+                <ul class="suggestions" id="origenSuggestions"></ul>
+            </div>
         </div>
 
         <div class="form-group">
             <label for="destino">Dirección de Destino:</label>
-            <input type="text" id="destino" placeholder="Ej: Passeig de Gràcia 50, Barcelona">
+            <div class="autocomplete-wrapper">
+                <input type="text" id="destino" placeholder="Ej: Passeig de Gràcia 50, Barcelona" autocomplete="off">
+                <ul class="suggestions" id="destinoSuggestions"></ul>
+            </div>
         </div>
 
         <div class="form-group">
